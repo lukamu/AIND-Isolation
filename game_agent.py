@@ -3,6 +3,7 @@ test your agent's strength against a set of known agents using tournament.py
 and include the results in your report.
 """
 import random
+import math
 
 
 class SearchTimeout(Exception):
@@ -10,7 +11,24 @@ class SearchTimeout(Exception):
     pass
 
 
+def centrality(game, move):
+    x, y = move
+    cx, cy = (math.ceil(game.width / 2), math.ceil(game.height / 2))
+    return (game.width - cx) ** 2 + (game.height - cy) ** 2 - (x - cx) ** 2 - (y - cy) ** 2
+
+
 def custom_score(game, player):
+    if game.is_loser(player):
+        return float("-inf")
+
+    if game.is_winner(player):
+        return float("inf")
+
+    own_moves = len(game.get_legal_moves(player))
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+    return float(own_moves - opp_moves)
+
+def custom_score_1(game, player):
     """Calculate the heuristic value of a game state from the point of view
     of the given player.
 
@@ -34,8 +52,12 @@ def custom_score(game, player):
     float
         The heuristic value of the current game state to the specified player.
     """
-    # TODO: finish this function!
-    raise NotImplementedError
+    if game.is_winner(player) or game.is_loser(player):
+        return game.utility(player)
+    moves = len(game.get_legal_moves())
+    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
+
+    return float(moves - opp_moves + centrality(game, game.get_player_location(player)))
 
 
 def custom_score_2(game, player):
@@ -170,6 +192,106 @@ class MinimaxPlayer(IsolationPlayer):
         # Return the best move from the last completed search iteration
         return best_move
 
+
+    def terminaltest(self, game):
+        """Utility function for minimax algo. Return legals moves, if any, otherwise return +/- inf or 0
+         using utility function according to the specs given in pseudocode implementation.
+
+         Parameters
+         ----------
+         game : isolation.Board
+             An instance of the Isolation game `Board` class representing the
+             current game state
+
+         Returns
+         -------
+         Boolean
+             Returns true if there are no legal moves left"""
+
+        return True if len(game.get_legal_moves())==0 else False
+
+
+    def maxvalue(self, game, depth):
+        """Implement max search algorithm for minimax as described in AIMA pseudo-code.
+
+         Parameters
+         ----------
+         game : isolation.Board
+             An instance of the Isolation game `Board` class representing the
+             current game state
+
+         depth : int
+             Depth is an integer representing the maximum number of plies to
+             search in the game tree before aborting
+
+         Returns
+         -------
+         max_val: maximum value, or +/- inf if no moves available
+         """
+
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        #Test if there are legal moves. If not return utility function value according to pseudocode specs.
+        if self.terminaltest(game):
+            return game.utility(self)
+
+        # Check if reached the root
+        if depth==0:
+            return self.score(game, self)
+
+        # max_score at -inf, as specified in pseudocode
+        max_score = float("-inf")
+
+        # Get all possible moves at the current state
+        possible_moves = game.get_legal_moves()
+
+        for move in possible_moves:
+            max_score = max(max_score, self.minvalue(game.forecast_move(move), depth - 1))
+
+        return max_score
+
+    def minvalue(self, game, depth):
+        """Implement min search algorithm for minimax as described in AIMA pseudo-code.
+
+         Parameters
+         ----------
+         game : isolation.Board
+             An instance of the Isolation game `Board` class representing the
+             current game state
+
+         depth : int
+             Depth is an integer representing the maximum number of plies to
+             search in the game tree before aborting
+
+         Returns
+         -------
+         min_val: minimum value, or +/- inf if no moves available
+         """
+
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        #Test if there are legal moves. If not return utility function value according to pseudocode specs.
+        if self.terminaltest(game):
+            return game.utility(self)
+
+        # Check if reached the root
+        if depth==0:
+            return self.score(game, self)
+
+        # min_score at inf, as specified in pseudocode
+        min_score = float("inf")
+
+        # Get all possible moves at the current state
+        possible_moves = game.get_legal_moves()
+
+        for move in possible_moves:
+            min_score = min(min_score, self.maxvalue(game.forecast_move(move), depth - 1))
+
+        return min_score
+
+
     def minimax(self, game, depth):
         """Implement depth-limited minimax search algorithm as described in
         the lectures.
@@ -212,8 +334,27 @@ class MinimaxPlayer(IsolationPlayer):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # Get all possible moves at the current state
+        possible_moves = game.get_legal_moves()
+
+        # Check if there are any legal moves left. If not return (-1,-1) as requested.
+        if not possible_moves:
+            return (-1,-1)
+
+        # set best_score and best_move values at the lowest
+        best_score = float("-inf")
+        best_move = (-1,-1)
+
+        for move in possible_moves:
+            child_score = self.maxvalue(game.forecast_move(move), depth - 1)
+            # Identify the minimum score branch for the opponent.
+            if child_score > best_score:
+                best_score = child_score
+                best_move = move
+
+        print ("best move: {}".format(best_move))
+        return best_move
+
 
 
 class AlphaBetaPlayer(IsolationPlayer):
@@ -221,6 +362,22 @@ class AlphaBetaPlayer(IsolationPlayer):
     search with alpha-beta pruning. You must finish and test this player to
     make sure it returns a good move before the search time limit expires.
     """
+    def terminaltest(self, game):
+        """Utility function for minimax algo. Return legals moves, if any, otherwise return +/- inf or 0
+         using utility function according to the specs given in pseudocode implementation.
+
+         Parameters
+         ----------
+         game : isolation.Board
+             An instance of the Isolation game `Board` class representing the
+             current game state
+
+         Returns
+         -------
+         Boolean
+             Returns true if there are no legal moves left"""
+
+        return True if len(game.get_legal_moves())==0 else False
 
     def get_move(self, game, time_left):
         """Search for the best move from the available legal moves and return a
@@ -256,6 +413,106 @@ class AlphaBetaPlayer(IsolationPlayer):
 
         # TODO: finish this function!
         raise NotImplementedError
+
+
+    def alpha_maxvalue(self, game, depth, alpha=float("-inf"), beta=float("inf")):
+        """Implement max search algorithm for alpha-beta as described in AIMA pseudo-code.
+
+         Parameters
+         ----------
+         game : isolation.Board
+            An instance of the Isolation game `Board` class representing the
+            current game state
+
+        depth : int
+            Depth is an integer representing the maximum number of plies to
+            search in the game tree before aborting
+
+        alpha : float
+            Alpha limits the lower bound of search on minimizing layers
+
+        beta : float
+            Beta limits the upper bound of search on maximizing layers
+
+         Returns
+         -------
+         max_val: maximum value, or +/- inf if no moves available
+         """
+
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        #Test if there are legal moves. If not return utility function value according to pseudocode specs.
+        if self.terminaltest(game):
+            return game.utility(self)
+
+        # Check if reached the root
+        if depth==0:
+            return self.score(game, self)
+
+        # max_score at -inf, as specified in pseudocode
+        max_score = float("-inf")
+
+        # Get all possible moves at the current state
+        possible_moves = game.get_legal_moves()
+
+        for move in possible_moves:
+            max_score = max(max_score, self.alpha_minvalue(game.forecast_move(move), depth - 1), alpha, beta)
+            if max_score >= beta:
+                return max_score
+            alpha = max(alpha, max_score)
+
+        return max_score
+
+    def alpha_minvalue(self, game, depth, alpha=float("-inf"), beta=float("inf")):
+        """Implement min search algorithm for alpha-beta as described in AIMA pseudo-code.
+
+         Parameters
+         ----------
+         game : isolation.Board
+            An instance of the Isolation game `Board` class representing the
+            current game state
+
+        depth : int
+            Depth is an integer representing the maximum number of plies to
+            search in the game tree before aborting
+
+        alpha : float
+            Alpha limits the lower bound of search on minimizing layers
+
+        beta : float
+            Beta limits the upper bound of search on maximizing layers
+
+         Returns
+         -------
+         min_val: minimum value, or +/- inf if no moves available
+         """
+
+        if self.time_left() < self.TIMER_THRESHOLD:
+            raise SearchTimeout()
+
+        #Test if there are legal moves. If not return utility function value according to pseudocode specs.
+        if self.terminaltest(game):
+            return game.utility(self)
+
+        # Check if reached the root
+        if depth==0:
+            return self.score(game, self)
+
+        # min_score at inf, as specified in pseudocode
+        min_score = float("inf")
+
+        # Get all possible moves at the current state
+        possible_moves = game.get_legal_moves()
+
+        for move in possible_moves:
+            min_score = min(min_score, self.alpha_maxvalue(game.forecast_move(move), depth - 1), alpha, beta)
+            if min_score <= alpha:
+                return min_score
+            beta = min(beta, min_score)
+
+        return min_score
+
 
     def alphabeta(self, game, depth, alpha=float("-inf"), beta=float("inf")):
         """Implement depth-limited minimax search with alpha-beta pruning as
@@ -305,5 +562,29 @@ class AlphaBetaPlayer(IsolationPlayer):
         if self.time_left() < self.TIMER_THRESHOLD:
             raise SearchTimeout()
 
-        # TODO: finish this function!
-        raise NotImplementedError
+        # Get all possible moves at the current state
+        possible_moves = game.get_legal_moves()
+
+        # Check if there are any legal moves left. If not return (-1,-1) as requested.
+        if not possible_moves:
+            return (-1, -1)
+
+        # set temp_max and best_move values at the lowest
+        best_score = float("-inf")
+        best_move = (-1, -1)
+
+        for move in possible_moves:
+            score = self.alpha_maxvalue(game.forecast_move(move), depth - 1, alpha, beta)
+
+            # Prune
+            if best_score >= beta:
+                return best_move
+
+            if score > best_score:
+                best_score = score
+                best_move = move
+
+            alpha = max(alpha, best_score)
+
+
+        return best_move

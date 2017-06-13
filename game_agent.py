@@ -618,10 +618,10 @@ class AlphaBetaPlayer(IsolationPlayer):
         best_move = (-1, -1)
 
         for move in possible_moves:
-            child_score = alpha_minvalue(game.forecast_move(move), 0, float("-inf"), float("inf"))
+            v = alpha_minvalue(game.forecast_move(move), depth - 1, best_score, float("inf"))
             # Identify the minimum score branch for the opponent.
-            if child_score > best_score:
-                best_score = child_score
+            if v > best_score:
+                best_score = v
                 best_move = move
 
         """

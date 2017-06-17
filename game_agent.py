@@ -11,12 +11,6 @@ class SearchTimeout(Exception):
     pass
 
 
-def centrality(game, move):
-    x, y = move
-    cx, cy = (math.ceil(game.width / 2), math.ceil(game.height / 2))
-    return (game.width - cx) ** 2 + (game.height - cy) ** 2 - (x - cx) ** 2 - (y - cy) ** 2
-
-
 def custom_score(game, player):
     if game.is_loser(player):
         return float("-inf")
@@ -24,11 +18,15 @@ def custom_score(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    own_moves = len(game.get_legal_moves(player))
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
-    return float(own_moves - opp_moves)
+    #Calculate the Manhattan distance from the opponent
+    own_location = game.get_player_location(player)
+    opp_location = game.get_player_location(game.get_opponent(player))
+    distance = abs(own_location[0] - opp_location[0]) + abs(own_location[1] - opp_location[1])
+    return float(distance)
 
-def custom_score_1(game, player):
+
+
+def custom_score_2(game, player):
     """Calculate the heuristic value of a game state from the point of view
     of the given player.
 
@@ -51,47 +49,26 @@ def custom_score_1(game, player):
     -------
     float
         The heuristic value of the current game state to the specified player.
+
+    Heuristic
+    ---------
+    Look for a move ahead to calculate the distance
     """
-    if game.is_winner(player) or game.is_loser(player):
-        return game.utility(player)
-    moves = len(game.get_legal_moves())
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
 
-    return float(moves - opp_moves + centrality(game, game.get_player_location(player)))
+    own_score = 0
+    opp_score = 0
+    own_moves = game.get_legal_moves(player)
+    opp_moves = game.get_legal_moves(game.get_opponent(player))
+    for move in own_moves:
+        next_ply_board = game.forecast_move(move)
+        own_score += len(next_ply_board.get_legal_moves(player))
 
+    for move in opp_moves:
+        next_ply_board = game.forecast_move(move)
+        opp_score += len(next_ply_board.get_legal_moves(next_ply_board.get_opponent(player)))
 
-def custom_score_2(game, player):
-    """Calculate the heuristic value of a game state from the point of view
-    of the given player.
+    return float(own_score - opp_score)
 
-    Note: this function should be called from within a Player instance as
-    `self.score()` -- you should not need to call this function directly.
-
-    Parameters
-    ----------
-    game : `isolation.Board`
-        An instance of `isolation.Board` encoding the current state of the
-        game (e.g., player locations and blocked cells).
-
-    player : object
-        A player instance in the current game (i.e., an object corresponding to
-        one of the player objects `game.__player_1__` or `game.__player_2__`.)
-
-    Returns
-    -------
-    float
-        The heuristic value of the current game state to the specified player.
-    """
-    # TODO: finish this function!
-    if game.is_loser(player):
-        return float("-inf")
-
-    if game.is_winner(player):
-        return float("inf")
-
-    own_moves = len(game.get_legal_moves(player))
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
-    return float(own_moves - opp_moves)
 
 
 def custom_score_3(game, player):
@@ -115,7 +92,14 @@ def custom_score_3(game, player):
     -------
     float
         The heuristic value of the current game state to the specified player.
+
+    Heuristic
+    ---------
+    Assing to moves in the center of the board highest value, adding 50% to the score, and the worst
+    score to the moves in the corners, and along the edges.
     """
+
+
     # TODO: finish this function!
     if game.is_loser(player):
         return float("-inf")
@@ -123,10 +107,25 @@ def custom_score_3(game, player):
     if game.is_winner(player):
         return float("inf")
 
-    own_moves = len(game.get_legal_moves(player))
-    opp_moves = len(game.get_legal_moves(game.get_opponent(player)))
-    return float(own_moves - opp_moves)
+    h, w = game.height, game.width
+    score = 1
+    own_moves = game.get_legal_moves(player)
+    for move in own_moves:
+        #Center of the board, best score: +50%
+        if move in [(2, 2), (2, 3), (2, 4), (3, 2), (3, 3), (3, 4), (4, 2), (4, 3), (4, 4)]:
+            score += score * 0.5
+        #Corners of the board, worse position: +0%
+        elif move in [(0, 0), (0, w - 1), (h - 1, 0), (h - 1, w - 1)]:
+            score += score * 0.0
+        #Along the edges, bad position: + 10%
+        elif ((move[0] == 0 or move[0] == h - 1) and move[1] >= 1 and move[1] <= w - 2) or (
+                (move[1] == 0 or move[1] == w - 1) and move[0] >= 1 and move[0] <= h - 2):
+            score += score * 0.10
+        #Any other position: + 20%
+        else:
+            score += score * 0.20
 
+    return float(score)
 
 class IsolationPlayer:
     """Base class for minimax and alphabeta agents -- this class is never
@@ -294,7 +293,7 @@ class MinimaxPlayer(IsolationPlayer):
             if terminaltest(game):
                 return game.utility(self)
 
-            # Check if reached the root
+            # Check using score function
             if depth == 0:
                 return self.score(game, self)
 
@@ -367,7 +366,7 @@ class MinimaxPlayer(IsolationPlayer):
                 best_score = child_score
                 best_move = move
 
-        print ("best move: {}".format(best_move))
+        #print("minimax - best_move: {}, best_score: {}, depth: {}".format(best_move, best_score, depth))
         return best_move
 
 
@@ -414,24 +413,23 @@ class AlphaBetaPlayer(IsolationPlayer):
         # Initialize the best move so that this function returns something
         # in case the search fails due to timeout
         best_move = (-1, -1)
+        best_move_list = [(-1, -1)]
+        depth = 1
 
+        #Iterate till timeout expires
         try:
-            depth = 1
-            selected = [(-1, -1)]
             while True:
                 best_move = self.alphabeta(game, depth)
-                selected.append(best_move)
+                best_move_list.append(best_move)
                 depth += 1
-            return best_move
-
 
         except SearchTimeout:
             if depth == 1:
-                legal_moves = game.get_legal_moves()
-                if len(legal_moves):
-                    best_move = legal_moves[0]
+                possible_moves = game.get_legal_moves()
+                if len(possible_moves):
+                    best_move = possible_moves[0]
             else:
-                best_move = selected[depth - 1]
+                best_move = best_move_list[depth - 1]
             return best_move
 
         # Return the best move from the last completed search iteration
@@ -616,22 +614,18 @@ class AlphaBetaPlayer(IsolationPlayer):
 
         # initialize best_move using the worst case
         best_move = (-1, -1)
+        #best_move = possible_moves[0]
 
         for move in possible_moves:
-            v = alpha_minvalue(game.forecast_move(move), depth - 1, best_score, float("inf"))
+            v = alpha_minvalue(game.forecast_move(move), depth - 1, alpha, beta)
             # Identify the minimum score branch for the opponent.
             if v > best_score:
                 best_score = v
                 best_move = move
 
-        """
-        for move in possible_moves:
-            v = max(v, self.alpha_minvalue(game.forecast_move(move), depth, float("-inf"), float("inf")))
-            if v >= beta:
-                return move
+            #if best_score >= beta:
+            #    return best_move
             alpha = max(alpha, v)
 
-            best_move = move
-        """
 
         return best_move

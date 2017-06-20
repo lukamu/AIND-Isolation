@@ -12,13 +12,39 @@ class SearchTimeout(Exception):
 
 
 def custom_score(game, player):
+    """Calculate the heuristic value of a game state from the point of view
+    of the given player.
+
+    This should be the best heuristic function for your project submission.
+
+    Note: this function should be called from within a Player instance as
+    `self.score()` -- you should not need to call this function directly.
+
+    Parameters
+    ----------
+    game : `isolation.Board`
+        An instance of `isolation.Board` encoding the current state of the
+        game (e.g., player locations and blocked cells).
+
+    player : object
+        A player instance in the current game (i.e., an object corresponding to
+        one of the player objects `game.__player_1__` or `game.__player_2__`.)
+
+    Returns
+    -------
+    float
+        The heuristic value of the current game state to the specified player.
+
+    Heuristic
+    ---------
+    Calculate the Manhattan distance from the opponent
+    """
     if game.is_loser(player):
         return float("-inf")
 
     if game.is_winner(player):
         return float("inf")
 
-    #Calculate the Manhattan distance from the opponent
     own_location = game.get_player_location(player)
     opp_location = game.get_player_location(game.get_opponent(player))
     distance = abs(own_location[0] - opp_location[0]) + abs(own_location[1] - opp_location[1])
@@ -355,18 +381,16 @@ class MinimaxPlayer(IsolationPlayer):
         if not possible_moves:
             return (-1,-1)
 
-        # set best_score and best_move values at the lowest
+        # set best_score and best_move values at the lowest value
         best_score = float("-inf")
         best_move = (-1,-1)
 
         for move in possible_moves:
             child_score = minvalue(game.forecast_move(move), depth - 1)
-            # Identify the minimum score branch for the opponent.
             if child_score > best_score:
                 best_score = child_score
                 best_move = move
 
-        #print("minimax - best_move: {}, best_score: {}, depth: {}".format(best_move, best_score, depth))
         return best_move
 
 
@@ -432,7 +456,6 @@ class AlphaBetaPlayer(IsolationPlayer):
                 best_move = best_move_list[depth - 1]
             return best_move
 
-        # Return the best move from the last completed search iteration
         return best_move
 
 
@@ -583,7 +606,6 @@ class AlphaBetaPlayer(IsolationPlayer):
             if terminaltest(game):
                 return game.utility(self)
 
-            # Check if reached the root
             if depth == 0:
                 return self.score(game, self)
 
@@ -618,14 +640,9 @@ class AlphaBetaPlayer(IsolationPlayer):
 
         for move in possible_moves:
             v = alpha_minvalue(game.forecast_move(move), depth - 1, alpha, beta)
-            # Identify the minimum score branch for the opponent.
             if v > best_score:
                 best_score = v
                 best_move = move
-
-            #if best_score >= beta:
-            #    return best_move
             alpha = max(alpha, v)
-
 
         return best_move
